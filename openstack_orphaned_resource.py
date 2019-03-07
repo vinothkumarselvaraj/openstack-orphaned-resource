@@ -12,7 +12,7 @@ from novaclient import client as novaclient
 
 def usage():
     print "listorphans.py <object> where object is one or more of",
-    print "'networks', 'routers', 'subnets', 'floatingips', 'servers' or 'all'"
+    print "'networks', 'routers', 'subnets', 'floatingips', 'ports', 'servers', 'secgroup' or 'all'"
 
 username=os.environ['OS_USERNAME']
 password=os.environ['OS_PASSWORD']
@@ -32,6 +32,7 @@ def get_projectids():
 
 def get_orphaned_neutron_objects(object):
     projectids = get_projectids()
+    projectids.append("")
     objects = getattr(neutron, 'list_' + object)()
     orphans = []
     for object in objects.get(object):
@@ -41,22 +42,35 @@ def get_orphaned_neutron_objects(object):
 
 def get_orphaned_nova_objects():
     projectids = get_projectids()
-    projectids.append(None)
+    projectids.append("")
     orphans = []
     for server in nova.servers.list(search_opts={'all_tenants': 1}):
         if server.tenant_id not in projectids:
            orphans.append(server.id)
     return orphans
 
+def get_orphaned_security_group_objects():
+    projectids = get_projectids()
+    projectids.append("")
+    orphans = []
+    for secgroup in nova.security_groups.list(search_opts={'all_tenants': 1}):
+        if secgroup.tenant_id not in projectids:
+           orphans.append(secgroup.id)
+    return orphans
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         if sys.argv[1] == 'all':
-            objects = [ 'networks', 'routers', 'subnets', 'floatingips', 'servers' ]
+            objects = [ 'networks', 'routers', 'subnets', 'floatingips', 'ports', 'servers', 'secgroup' ]
         else:
             objects = sys.argv[1:]
         for object in objects:
             if object=="servers":
               orphans = get_orphaned_nova_objects()
+              print len(orphans), 'orphan(s) found of type', object
+              print '\n'.join(map(str, orphans))
+            elif object=="secgroup":
+              orphans = get_orphaned_security_group_objects()
               print len(orphans), 'orphan(s) found of type', object
               print '\n'.join(map(str, orphans))
             else:
